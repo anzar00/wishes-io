@@ -13,7 +13,8 @@ export default function CreateEvent({ user, onCancel, onSave, onPreview, initial
     animation: initialData?.animation || 'balloons',
     creatorMessage: initialData?.creatorMessage || '',
     creatorImage: initialData?.creatorImage || '',
-    isQuizEnabled: initialData?.isQuizEnabled !== false, // Default true
+    secretTitle: initialData?.secretTitle || 'My Letter to You', // New Field
+    isQuizEnabled: initialData?.isQuizEnabled !== false, 
   });
   
   const [questions, setQuestions] = useState(initialData?.quizQuestions || [{ id: 1, text: "What is my favorite food?", options: ["Pizza", "Sushi", "Tacos", "Burger"], correct: "Pizza" }]);
@@ -88,6 +89,13 @@ export default function CreateEvent({ user, onCancel, onSave, onPreview, initial
           {/* Creator Message */}
           <div>
             <h3 className="font-bold mb-4 flex items-center gap-2"><MessageCircle size={18} className="text-blue-500"/> Your Private Letter</h3>
+            
+            {/* New Title Field */}
+            <div className="mb-4">
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Letter Title</label>
+               <input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200" placeholder="e.g. My Letter to You" value={formData.secretTitle} onChange={e => setFormData({...formData, secretTitle: e.target.value})} />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-2">
                 <textarea className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 h-40 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Write your personal birthday letter here..." value={formData.creatorMessage} onChange={e => setFormData({...formData, creatorMessage: e.target.value})}/>
@@ -140,4 +148,4 @@ export default function CreateEvent({ user, onCancel, onSave, onPreview, initial
       </div>
     </div>
   );
-}
+};

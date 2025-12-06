@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Heart, Plane, Gift, PartyPopper, Sparkles, Unlock, X } from 'lucide-react';
+import { Lock, Heart, Plane, Gift, PartyPopper, Sparkles, Unlock, X, Flower, RotateCcw, CheckCircle, XCircle } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -11,6 +11,10 @@ export default function RecipientView({ event, onBack }) {
   const [quizStep, setQuizStep] = useState(0);
   const [wishes, setWishes] = useState([]);
   const [flying, setFlying] = useState(false);
+  
+  // New State for Scoring
+  const [score, setScore] = useState(0);
+  const [quizFinished, setQuizFinished] = useState(false);
 
   const mockWishes = [
     { id: 1, name: "Alice", text: "Happy Birthday! Hope you have an amazing day!", color: "bg-pink-100", createdAt: 1 },
@@ -53,11 +57,34 @@ export default function RecipientView({ event, onBack }) {
     }
   }, [status, event]);
 
+  // Unlock sequence: Just unlock immediately, animation happens via CSS
+  const handleUnlockSequence = () => {
+    setQuizOpen(false);
+    setCreatorUnlocked(true);
+  };
+
   const handleQuizAnswer = (ans) => {
-    if (ans === event.quizQuestions[quizStep].correct) {
-      if (quizStep + 1 < event.quizQuestions.length) setQuizStep(s => s + 1);
-      else { setCreatorUnlocked(true); setQuizOpen(false); }
-    } else { alert("Oops! Wrong answer. Try again! 🙈"); }
+    const isCorrect = ans === event.quizQuestions[quizStep].correct;
+    
+    // Optimistically update score if correct
+    if (isCorrect) {
+      setScore(prev => prev + 1);
+    }
+
+    if (quizStep + 1 < event.quizQuestions.length) {
+      setQuizStep(prev => prev + 1);
+    } else {
+      // Quiz Finished - Show results
+      setQuizFinished(true);
+    }
+  };
+
+  const handleDirectUnlock = () => handleUnlockSequence();
+
+  const handleRetryQuiz = () => {
+    setScore(0);
+    setQuizStep(0);
+    setQuizFinished(false);
   };
 
   const AnimationElement = () => {
@@ -119,21 +146,34 @@ export default function RecipientView({ event, onBack }) {
 
         {event.creatorMessage && (
           <div className="max-w-2xl mx-auto mt-20 mb-20">
-            {(!creatorUnlocked && event.isQuizEnabled) ? (
+            {(!creatorUnlocked) ? (
               <div className="bg-slate-900 text-white rounded-3xl p-8 text-center shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
                 <Lock size={48} className="mx-auto mb-4 text-blue-400 relative z-10" />
                 <h3 className="text-2xl font-bold mb-2 relative z-10">One Last Surprise</h3>
-                <p className="text-slate-400 mb-6 relative z-10">I have written a special letter for you, but you need to answer a few questions first.</p>
-                <button onClick={() => setQuizOpen(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-full font-bold transition shadow-lg shadow-blue-500/30 relative z-10">Unlock Secret Message</button>
+                <p className="text-slate-400 mb-6 relative z-10">I have written a special letter for you{event.isQuizEnabled ? ", but you need to answer a few questions first." : "."}</p>
+                <button onClick={() => event.isQuizEnabled ? setQuizOpen(true) : handleDirectUnlock()} className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-full font-bold transition shadow-lg shadow-blue-500/30 relative z-10">Unlock Secret Message</button>
               </div>
             ) : (
               <div className="bg-white border-2 border-blue-100 rounded-3xl p-8 md:p-12 shadow-xl animate-fadeIn relative overflow-hidden">
-                <div className="absolute -top-4 -right-4 bg-blue-600 text-white p-2 rounded-lg rotate-12 shadow-lg"><Unlock size={24} /></div>
-                <h3 className="text-2xl font-bold mb-6 text-slate-800 text-center">My Letter to You</h3>
-                {event.creatorImage && <img src={event.creatorImage} className="w-full h-64 object-cover rounded-xl mb-6 shadow-sm" />}
-                <div className="prose prose-slate mx-auto whitespace-pre-wrap leading-relaxed text-lg text-slate-700">{event.creatorMessage}</div>
-                <div className="mt-8 text-center"><Heart className="mx-auto text-red-500 fill-red-500 animate-bounce" /></div>
+                {/* Bouquet Decorations inside the unlocked card */}
+                <div className="absolute bottom-0 right-0 pointer-events-none transform translate-y-10 translate-x-10 opacity-80">
+                   <div className="relative w-48 h-48 animate-[bloom_1.5s_ease-out_forwards]">
+                      <Flower className="absolute bottom-12 right-12 text-pink-500 w-24 h-24 rotate-[-12deg]" />
+                      <Flower className="absolute bottom-4 right-20 text-purple-400 w-20 h-20 rotate-[-45deg]" />
+                      <Flower className="absolute bottom-20 right-4 text-red-400 w-16 h-16 rotate-[15deg]" />
+                      <Flower className="absolute bottom-8 right-8 text-yellow-400 w-12 h-12 rotate-[0deg] z-10" />
+                   </div>
+                </div>
+
+                <div className="absolute -top-4 -right-4 bg-blue-600 text-white p-2 rounded-lg rotate-12 shadow-lg z-20"><Unlock size={24} /></div>
+                
+                <div className="relative z-10">
+                  <h3 className="text-2xl font-bold mb-6 text-slate-800 text-center">{event.secretTitle || "My Letter to You"}</h3>
+                  {event.creatorImage && <img src={event.creatorImage} className="w-full h-64 object-cover rounded-xl mb-6 shadow-sm" />}
+                  <div className="prose prose-slate mx-auto whitespace-pre-wrap leading-relaxed text-lg text-slate-700 mb-12">{event.creatorMessage}</div>
+                  <div className="mt-8 text-center"><Heart className="mx-auto text-red-500 fill-red-500 animate-bounce" /></div>
+                </div>
               </div>
             )}
           </div>
@@ -142,15 +182,81 @@ export default function RecipientView({ event, onBack }) {
 
       {quizOpen && event.quizQuestions && (
         <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md p-8 text-center relative animate-scaleIn">
-            <button onClick={() => setQuizOpen(false)} className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full"><X size={20}/></button>
-            <div className="mb-6"><span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full uppercase">Question {quizStep + 1} of {event.quizQuestions.length}</span></div>
-            <h3 className="text-xl font-bold mb-6 text-slate-900">{event.quizQuestions[quizStep].text}</h3>
-            <div className="grid gap-3">{event.quizQuestions[quizStep].options.map((opt, i) => <button key={i} onClick={() => handleQuizAnswer(opt)} className="p-4 rounded-xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50 transition font-medium text-slate-700">{opt}</button>)}</div>
+          <div className="bg-white rounded-3xl w-full max-w-md p-8 text-center relative animate-scaleIn overflow-hidden">
+            <button onClick={() => setQuizOpen(false)} className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full z-10"><X size={20}/></button>
+            
+            {/* Quiz Progress Bar */}
+            <div className="h-1 w-full bg-slate-100 absolute top-0 left-0">
+              <div 
+                className="h-full bg-blue-500 transition-all duration-300" 
+                style={{ width: `${((quizStep + (quizFinished ? 1 : 0)) / event.quizQuestions.length) * 100}%` }}
+              ></div>
+            </div>
+
+            {!quizFinished ? (
+              // --- QUESTION VIEW ---
+              <>
+                <div className="mb-6 mt-4">
+                  <span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full uppercase">Question {quizStep + 1} of {event.quizQuestions.length}</span>
+                </div>
+                
+                <h3 className="text-xl font-bold mb-6 text-slate-900">{event.quizQuestions[quizStep].text}</h3>
+                
+                <div className="grid gap-3">
+                  {event.quizQuestions[quizStep].options.map((opt, i) => (
+                    <button 
+                      key={i} 
+                      onClick={() => handleQuizAnswer(opt)}
+                      className="p-4 rounded-xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50 transition font-medium text-slate-700 text-left"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              // --- RESULT VIEW ---
+              <div className="flex flex-col items-center justify-center py-6 animate-fadeIn">
+                {score / event.quizQuestions.length >= 0.7 ? (
+                  <>
+                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+                      <CheckCircle size={40} />
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-800 mb-2">You Passed! 🎉</h3>
+                    <p className="text-slate-500 mb-6">
+                      You got {score} out of {event.quizQuestions.length} correct.
+                    </p>
+                    <button 
+                      onClick={handleUnlockSequence}
+                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-green-200 transition transform hover:scale-105"
+                    >
+                      Reveal Message
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-20 h-20 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+                      <XCircle size={40} />
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-800 mb-2">Nice Try! 😅</h3>
+                    <p className="text-slate-500 mb-6">
+                      You scored {Math.round((score / event.quizQuestions.length) * 100)}%.<br/>
+                      You need 70% to unlock the secret.
+                    </p>
+                    <button 
+                      onClick={handleRetryQuiz}
+                      className="bg-slate-800 hover:bg-slate-900 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 transition"
+                    >
+                      <RotateCcw size={18} /> Try Again
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
-      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } } .animate-fadeIn { animation: fadeIn 1s ease-out forwards; } .animate-scaleIn { animation: scaleIn 0.2s ease-out forwards; } @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } } @keyframes floatUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-100vh) scale(1.5); opacity: 0; } }`}</style>
+      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } } .animate-fadeIn { animation: fadeIn 1s ease-out forwards; } .animate-scaleIn { animation: scaleIn 0.2s ease-out forwards; } @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } } @keyframes floatUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-100vh) scale(1.5); opacity: 0; } } @keyframes bloom { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }`}</style>
     </div>
   );
 };
