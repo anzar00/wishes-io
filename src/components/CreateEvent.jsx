@@ -13,7 +13,7 @@ export default function CreateEvent({ user, onCancel, onSave, onPreview, initial
     animation: initialData?.animation || 'balloons',
     creatorMessage: initialData?.creatorMessage || '',
     creatorImage: initialData?.creatorImage || '',
-    secretTitle: initialData?.secretTitle || 'My Letter to You', // New Field
+    secretTitle: initialData?.secretTitle || 'My Letter to You',
     isQuizEnabled: initialData?.isQuizEnabled !== false, 
   });
   
@@ -21,8 +21,25 @@ export default function CreateEvent({ user, onCancel, onSave, onPreview, initial
   const [saving, setSaving] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
 
-  const timezones = [ { value: 'UTC', label: 'UTC' }, { value: 'IST', label: 'IST' }, { value: 'CET', label: 'CET' }, { value: 'EST', label: 'EST' }, { value: 'PST', label: 'PST' }, { value: 'GMT', label: 'GMT' }];
-  const animations = [ { value: 'balloons', label: '🎈 Balloons' }, { value: 'confetti', label: '🎊 Confetti' }, { value: 'hearts', label: '❤️ Floating Hearts' }, { value: 'stars', label: '✨ Stars' } ];
+  // Updated Timezone List to match RecipientView support
+  const timezones = [
+    { value: 'UTC', label: 'UTC (Universal)' },
+    { value: 'IST', label: 'IST (India)' },
+    { value: 'CET', label: 'CET (Central Europe)' },
+    { value: 'EST', label: 'EST (US Eastern)' },
+    { value: 'PST', label: 'PST (US Pacific)' },
+    { value: 'GMT', label: 'GMT (UK Winter)' },
+    { value: 'BST', label: 'BST (UK Summer)' },
+    { value: 'JST', label: 'JST (Japan)' },
+    { value: 'AEDT', label: 'AEDT (Australia)' },
+  ];
+
+  const animations = [ 
+    { value: 'balloons', label: '🎈 Balloons' }, 
+    { value: 'confetti', label: '🎊 Confetti' }, 
+    { value: 'hearts', label: '❤️ Floating Hearts' }, 
+    { value: 'stars', label: '✨ Stars' } 
+  ];
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -79,7 +96,15 @@ export default function CreateEvent({ user, onCancel, onSave, onPreview, initial
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div><label className="text-xs font-bold text-slate-500 uppercase">Title</label><input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required /></div>
             <div><label className="text-xs font-bold text-slate-500 uppercase">Recipient</label><input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200" value={formData.recipientName} onChange={e => setFormData({...formData, recipientName: e.target.value})} required /></div>
-            <div><label className="text-xs font-bold text-slate-500 uppercase">Unlock Date</label><div className="flex gap-2"><input type="datetime-local" className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200" value={formData.unlockDate} onChange={e => setFormData({...formData, unlockDate: e.target.value})} required /><select className="w-24 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={formData.timezone} onChange={e => setFormData({...formData, timezone: e.target.value})}>{timezones.map(tz => <option key={tz.value} value={tz.value}>{tz.value}</option>)}</select></div></div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase">Unlock Date</label>
+              <div className="flex gap-2">
+                <input type="datetime-local" className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200" value={formData.unlockDate} onChange={e => setFormData({...formData, unlockDate: e.target.value})} required />
+                <select className="w-32 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={formData.timezone} onChange={e => setFormData({...formData, timezone: e.target.value})}>
+                  {timezones.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+                </select>
+              </div>
+            </div>
             <div><label className="text-xs font-bold text-slate-500 uppercase">Theme</label><select className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200" value={formData.theme} onChange={e => setFormData({...formData, theme: e.target.value})}><option value="birthday">🎉 Birthday</option><option value="travel">✈️ Travel</option><option value="minimal">✨ Minimal</option></select></div>
             <div className="md:col-span-2"><label className="text-xs font-bold text-slate-500 uppercase">Unlock Animation</label><select className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200" value={formData.animation} onChange={e => setFormData({...formData, animation: e.target.value})}>{animations.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}</select></div>
           </div>

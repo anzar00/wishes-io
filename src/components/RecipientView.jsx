@@ -12,38 +12,87 @@ export default function RecipientView({ event, onBack }) {
   const [wishes, setWishes] = useState([]);
   const [flying, setFlying] = useState(false);
   
-  // New State for Scoring
+  // Scoring State
   const [score, setScore] = useState(0);
   const [quizFinished, setQuizFinished] = useState(false);
 
+  // Smart Timezone Mapping (Abbreviation -> IANA Zone)
+  // This automatically handles Daylight Saving Time adjustments
+  const ianaZones = {
+    'UTC': 'UTC',
+    'IST': 'Asia/Kolkata',
+    'CET': 'Europe/Paris',        // Covers Central Europe
+    'EST': 'America/New_York',    // Covers US Eastern Time
+    'PST': 'America/Los_Angeles', // Covers US Pacific Time
+    'GMT': 'Europe/London',       // UK Time
+    'BST': 'Europe/London',       // UK Time (Summer)
+    'JST': 'Asia/Tokyo',
+    'AEDT': 'Australia/Sydney'
+  };
+
   const mockWishes = [
-    { id: 1, name: "Alice", text: "Happy Birthday! Hope you have an amazing day!", color: "bg-pink-100", createdAt: 1 },
-    { id: 2, name: "Bob", text: "Can't wait to celebrate with you.", color: "bg-blue-100", createdAt: 2 },
+    { id: 1, name: "Alice", text: "Happy Birthday!", color: "bg-pink-100", createdAt: 1 },
+    { id: 2, name: "Bob", text: "Can't wait to celebrate!", color: "bg-blue-100", createdAt: 2 },
     { id: 3, name: "Charlie", text: "Sending lots of love!", color: "bg-yellow-100", createdAt: 3 }
   ];
 
   useEffect(() => {
     if (!event) return;
+
     const checkTime = () => {
-      const now = new Date();
-      const unlock = new Date(event.unlockDate);
-      if (now >= unlock || event.isPreview) { 
+      // 1. Determine the target zone
+      const targetZone = ianaZones[event.timezone] || 'UTC';
+
+      // 2. Get "Now" but shifted to the Target Zone's wall-clock time
+      // We use Intl to format the current time as it appears in that city
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: targetZone,
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: 'numeric', second: 'numeric',
+        hour12: false
+      });
+      
+      const parts = formatter.formatToParts(new Date());
+      const getPart = (type) => parseInt(parts.find(p => p.type === type).value, 10);
+
+      // Construct a "Wall Clock" Date object (treated as UTC to avoid local timezone interference)
+      // Note: Month is 0-indexed in JS Date, but 1-indexed in Intl format
+      const nowInTargetZone = new Date(Date.UTC(
+        getPart('year'),
+        getPart('month') - 1,
+        getPart('day'),
+        getPart('hour'),
+        getPart('minute'),
+        getPart('second')
+      ));
+
+      // 3. Construct the Unlock Date as a "Wall Clock" Date object (also UTC)
+      // event.unlockDate format is "YYYY-MM-DDTHH:mm"
+      const unlockTime = new Date(event.unlockDate + ":00Z");
+
+      // 4. Compare the two "Wall Clocks"
+      if (nowInTargetZone >= unlockTime || event.isPreview) { 
         if (status !== 'unlocked') setStatus('unlocked');
       } else {
         setStatus('locked');
-        const diff = unlock - now;
+        // Calculate the difference
+        const diff = unlockTime - nowInTargetZone;
+        
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
         const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
         setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
       }
     };
+
     const timer = setInterval(checkTime, 1000);
-    checkTime();
+    checkTime(); // Run immediately
     return () => clearInterval(timer);
   }, [event, status]);
 
+  // --- REST OF THE COMPONENT ---
   useEffect(() => {
     if (status === 'unlocked') {
       setTimeout(() => setFlying(true), 500);
@@ -57,7 +106,6 @@ export default function RecipientView({ event, onBack }) {
     }
   }, [status, event]);
 
-  // Unlock sequence: Just unlock immediately, animation happens via CSS
   const handleUnlockSequence = () => {
     setQuizOpen(false);
     setCreatorUnlocked(true);
@@ -65,16 +113,11 @@ export default function RecipientView({ event, onBack }) {
 
   const handleQuizAnswer = (ans) => {
     const isCorrect = ans === event.quizQuestions[quizStep].correct;
-    
-    // Optimistically update score if correct
-    if (isCorrect) {
-      setScore(prev => prev + 1);
-    }
+    if (isCorrect) setScore(prev => prev + 1);
 
     if (quizStep + 1 < event.quizQuestions.length) {
       setQuizStep(prev => prev + 1);
     } else {
-      // Quiz Finished - Show results
       setQuizFinished(true);
     }
   };
@@ -105,7 +148,7 @@ export default function RecipientView({ event, onBack }) {
         <button onClick={onBack} className="absolute top-6 left-6 text-slate-500 hover:text-white transition">Exit Preview</button>
         <Lock size={64} className="mb-6 text-blue-500 animate-pulse" />
         <h1 className="text-3xl font-bold mb-2">Not Yet!</h1>
-        <p className="text-slate-400 mb-8">This surprise for {event.recipientName} is locked until {new Date(event.unlockDate).toLocaleDateString()}.</p>
+        <p className="text-slate-400 mb-8">This surprise for {event.recipientName} is locked until {new Date(event.unlockDate).toLocaleDateString()} {event.timezone}.</p>
         <div className="text-5xl md:text-7xl font-mono font-bold tracking-wider text-blue-400">{timeLeft}</div>
       </div>
     );
@@ -115,7 +158,6 @@ export default function RecipientView({ event, onBack }) {
     <div className="min-h-screen bg-slate-50 overflow-x-hidden relative">
       <button onClick={onBack} className="fixed top-6 left-6 z-50 bg-white/50 p-2 rounded-full hover:bg-white transition flex items-center gap-2 font-bold shadow-sm">{event.isPreview ? "Exit Preview" : "Exit"}</button>
       
-      {/* Animation Container */}
       <AnimationElement />
 
       <div className="h-screen flex flex-col items-center justify-center text-center p-6 relative">
@@ -156,7 +198,6 @@ export default function RecipientView({ event, onBack }) {
               </div>
             ) : (
               <div className="bg-white border-2 border-blue-100 rounded-3xl p-8 md:p-12 shadow-xl animate-fadeIn relative overflow-hidden">
-                {/* Bouquet Decorations inside the unlocked card */}
                 <div className="absolute bottom-0 right-0 pointer-events-none transform translate-y-10 translate-x-10 opacity-80">
                    <div className="relative w-48 h-48 animate-[bloom_1.5s_ease-out_forwards]">
                       <Flower className="absolute bottom-12 right-12 text-pink-500 w-24 h-24 rotate-[-12deg]" />
@@ -165,9 +206,7 @@ export default function RecipientView({ event, onBack }) {
                       <Flower className="absolute bottom-8 right-8 text-yellow-400 w-12 h-12 rotate-[0deg] z-10" />
                    </div>
                 </div>
-
                 <div className="absolute -top-4 -right-4 bg-blue-600 text-white p-2 rounded-lg rotate-12 shadow-lg z-20"><Unlock size={24} /></div>
-                
                 <div className="relative z-10">
                   <h3 className="text-2xl font-bold mb-6 text-slate-800 text-center">{event.secretTitle || "My Letter to You"}</h3>
                   {event.creatorImage && <img src={event.creatorImage} className="w-full h-64 object-cover rounded-xl mb-6 shadow-sm" />}
@@ -184,71 +223,28 @@ export default function RecipientView({ event, onBack }) {
         <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-md p-8 text-center relative animate-scaleIn overflow-hidden">
             <button onClick={() => setQuizOpen(false)} className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full z-10"><X size={20}/></button>
-            
-            {/* Quiz Progress Bar */}
-            <div className="h-1 w-full bg-slate-100 absolute top-0 left-0">
-              <div 
-                className="h-full bg-blue-500 transition-all duration-300" 
-                style={{ width: `${((quizStep + (quizFinished ? 1 : 0)) / event.quizQuestions.length) * 100}%` }}
-              ></div>
-            </div>
-
+            <div className="h-1 w-full bg-slate-100 absolute top-0 left-0"><div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${((quizStep + (quizFinished ? 1 : 0)) / event.quizQuestions.length) * 100}%` }}></div></div>
             {!quizFinished ? (
-              // --- QUESTION VIEW ---
               <>
-                <div className="mb-6 mt-4">
-                  <span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full uppercase">Question {quizStep + 1} of {event.quizQuestions.length}</span>
-                </div>
-                
+                <div className="mb-6 mt-4"><span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full uppercase">Question {quizStep + 1} of {event.quizQuestions.length}</span></div>
                 <h3 className="text-xl font-bold mb-6 text-slate-900">{event.quizQuestions[quizStep].text}</h3>
-                
-                <div className="grid gap-3">
-                  {event.quizQuestions[quizStep].options.map((opt, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => handleQuizAnswer(opt)}
-                      className="p-4 rounded-xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50 transition font-medium text-slate-700 text-left"
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
+                <div className="grid gap-3">{event.quizQuestions[quizStep].options.map((opt, i) => <button key={i} onClick={() => handleQuizAnswer(opt)} className="p-4 rounded-xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50 transition font-medium text-slate-700 text-left">{opt}</button>)}</div>
               </>
             ) : (
-              // --- RESULT VIEW ---
               <div className="flex flex-col items-center justify-center py-6 animate-fadeIn">
                 {score / event.quizQuestions.length >= 0.7 ? (
                   <>
-                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
-                      <CheckCircle size={40} />
-                    </div>
+                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4"><CheckCircle size={40} /></div>
                     <h3 className="text-2xl font-bold text-slate-800 mb-2">You Passed! 🎉</h3>
-                    <p className="text-slate-500 mb-6">
-                      You got {score} out of {event.quizQuestions.length} correct.
-                    </p>
-                    <button 
-                      onClick={handleUnlockSequence}
-                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-green-200 transition transform hover:scale-105"
-                    >
-                      Reveal Message
-                    </button>
+                    <p className="text-slate-500 mb-6">You got {score} out of {event.quizQuestions.length} correct.</p>
+                    <button onClick={handleUnlockSequence} className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-green-200 transition transform hover:scale-105">Reveal Message</button>
                   </>
                 ) : (
                   <>
-                    <div className="w-20 h-20 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
-                      <XCircle size={40} />
-                    </div>
+                    <div className="w-20 h-20 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4"><XCircle size={40} /></div>
                     <h3 className="text-2xl font-bold text-slate-800 mb-2">Nice Try! 😅</h3>
-                    <p className="text-slate-500 mb-6">
-                      You scored {Math.round((score / event.quizQuestions.length) * 100)}%.<br/>
-                      You need 70% to unlock the secret.
-                    </p>
-                    <button 
-                      onClick={handleRetryQuiz}
-                      className="bg-slate-800 hover:bg-slate-900 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 transition"
-                    >
-                      <RotateCcw size={18} /> Try Again
-                    </button>
+                    <p className="text-slate-500 mb-6">You scored {Math.round((score / event.quizQuestions.length) * 100)}%.<br/>You need 70% to unlock the secret.</p>
+                    <button onClick={handleRetryQuiz} className="bg-slate-800 hover:bg-slate-900 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 transition"><RotateCcw size={18} /> Try Again</button>
                   </>
                 )}
               </div>
