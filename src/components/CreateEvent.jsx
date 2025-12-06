@@ -99,7 +99,7 @@ export default function CreateEvent({ user, onCancel, onSave, onPreview, initial
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase">Unlock Date</label>
               <div className="flex gap-2">
-                <input type="datetime-local" className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200" value={formData.unlockDate} onChange={e => setFormData({...formData, unlockDate: e.target.value})} required />
+                <input type="datetime-local" className="flex-1 p-3 bg-slate-50 rounded-lg border border-slate-200 min-w-0" value={formData.unlockDate} onChange={e => setFormData({...formData, unlockDate: e.target.value})} required />
                 <select className="w-32 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={formData.timezone} onChange={e => setFormData({...formData, timezone: e.target.value})}>
                   {timezones.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
                 </select>
